@@ -6,6 +6,28 @@ Description: >
 Globals:
   Function:
     Timeout: 900
+    Runtime: go1.x
+    MemorySize: 128
+
+Parameters:
+  # event
+  S3Bucket_CostAndUsage_RawData:
+    Type: String
+    Default: ""
+  # report
+  SNS_Topic_Arn:
+    Type: String
+    Default: ""
+  S3Bucket_Of_AthenaReport_Output:
+    Type: String
+    Default: "" # s3://path/to/query/bucket/
+  Athena_Database:
+    Type: String
+    Default: ""
+  Athena_Workgroup:
+    Type: String
+    Default: ""
+  
 
 Resources:
   HelloWorldFunction:
@@ -13,14 +35,22 @@ Resources:
     Properties:
       CodeUri: app/
       Handler: app
-      Runtime: go1.x
       # Tracing: Active
-      # Events:
-      #   CatchAll:
-      #     Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-      #     Properties:
-      #       Path: /hello
-      #       Method: GET
-      # Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
-      #   Variables:
-      #     PARAM1: VALUE
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref S3Bucket_CostAndUsage_RawData
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                - Name: suffix      # "prefix" or "suffix"
+                  Value: ".csv"      # The value to search for in the S3 object key names
+      Environment: 
+        Variables:
+          SNS_Topic_Arn: !Ref SNS_Topic_Arn
+          S3Bucket_Of_AthenaReport_Output: !Ref S3Bucket_Of_AthenaReport_Output
+          Athena_Database: !Ref Athena_Database
+          Athena_Workgroup: !Ref Athena_Workgroup
+
