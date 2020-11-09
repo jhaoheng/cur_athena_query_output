@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -18,17 +17,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/sns"
 )
 
-var Querys = []string{
-	`SELECT line_item_product_code,
-				sum(line_item_blended_cost) AS cost,
-				month
-		FROM all
-		WHERE year='2020'
-			AND month='11'
-		GROUP BY  line_item_product_code, month
-		HAVING sum(line_item_blended_cost) > 0
-		ORDER BY  line_item_product_code;`,
-}
+var Query = `
+SELECT line_item_product_code,
+	sum(line_item_blended_cost) AS cost,
+	month
+FROM %s
+WHERE year='%s' AND month='%s'
+GROUP BY  line_item_product_code, month
+HAVING sum(line_item_blended_cost) > 0
+ORDER BY  line_item_product_code;
+`
 
 var (
 	S3_Bucket_Cost_And_Usage_RawData = os.Getenv("S3BucketCostAndUsageRawData")
@@ -41,7 +39,7 @@ var (
 	Athena_Query_Result_Location = fmt.Sprintf("s3://%s/athena-output", S3_Bucket_Cost_And_Usage_RawData)
 )
 
-func handler(ctx context.Context, s3Event events.S3Event) error {
+func handler(ctx context.Context) error {
 	fmt.Println("S3_Bucket_Cost_And_Usage_RawData 	=>", S3_Bucket_Cost_And_Usage_RawData)
 	fmt.Println("SNS_Topic_Arn 						=>", SNS_Topic_Arn)
 	fmt.Println("Athena_Database 					=>", Athena_Database)
@@ -52,17 +50,18 @@ func handler(ctx context.Context, s3Event events.S3Event) error {
 		panic(err)
 	}
 
-	for _, record := range s3Event.Records {
-		s3 := record.S3
-		fmt.Printf("[%s - %s] Bucket = %s, Key = %s \n", record.EventSource, record.EventTime, s3.Bucket.Name, s3.Object.Key)
-	}
+	//
+	year, month, _ := time.Now().UTC().Date()
+	Query = fmt.Sprintf(Query, Athena_Database, year, int(month))
+	//
+	queryExecutionId := athena_startQueryExecution(Query)
+	fmt.Println("queryExecutionId =>", queryExecutionId)
+	bucket, key := athena_getQueryExecution(queryExecutionId)
+	fmt.Println("bucket, key =>", bucket, key)
+	url, content := s3_getObjectAndPresignedURL(bucket, key)
+	fmt.Println("url, content =>", url, content)
+	sns_publish(url, content)
 
-	for _, query := range Querys {
-		queryExecutionId := athena_startQueryExecution(query)
-		bucket, key := athena_getQueryExecution(queryExecutionId)
-		url, content := s3_getObjectAndPresignedURL(bucket, key)
-		sns_publish(url, content)
-	}
 	return nil
 }
 
@@ -115,6 +114,10 @@ func athena_startQueryExecution(query string) (queryExecutionId string) {
 }
 
 func athena_getQueryExecution(queryExecutionId string) (s3_bucket, s3_key string) {
+	//
+START:
+	time.Sleep(time.Second * 2)
+	//
 	input := athena.GetQueryExecutionInput{}
 	input.SetQueryExecutionId(queryExecutionId)
 	output, err := svc_athena.GetQueryExecution(&input)
@@ -122,10 +125,14 @@ func athena_getQueryExecution(queryExecutionId string) (s3_bucket, s3_key string
 		panic(err)
 	}
 
-	if *output.QueryExecution.Status.State != "SUCCEEDED" {
-		err := errors.New("athena query fail")
-		panic(err)
+	text := fmt.Sprintf("athena query State => %s\n", *output.QueryExecution.Status.State)
+	if strings.ToLower(*output.QueryExecution.Status.State) == "failed" {
+		panic(errors.New(text))
+	} else if strings.ToLower(*output.QueryExecution.Status.State) != "succeeded" {
+		fmt.Println(text)
+		goto START
 	}
+
 	tmp := strings.ReplaceAll(*output.QueryExecution.ResultConfiguration.OutputLocation, "s3://", "")
 	s3_location := strings.SplitN(tmp, "/", 2)
 	s3_bucket = s3_location[0]

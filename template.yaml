@@ -21,7 +21,7 @@ Parameters:
     Description: ""
   AthenaDatabase:
     Type: String
-    Default: ""
+    Default: "athenacurcfn_$ReportName"
     Description: ""
   AthenaWorkgroup:
     Type: String
@@ -38,9 +38,40 @@ Resources:
       FunctionName: "generateAthenaReport"
       Description: "cost-and-usage bucket -> event -> lambda, process data -> sns"
 
+      Events:
+        CWSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: 'rate(1 day)'
+            Name: CUR_Athena_Query_To_SNS
+            Description: Cost and usage report, run Athena query and get result to SNS
+
       Environment: 
         Variables:
           S3BucketCostAndUsageRawData: !Ref S3BucketCostAndUsageRawData
           SNSTopicArn: !Ref SNSTopicArn
           AthenaDatabase: !Ref AthenaDatabase
           AthenaWorkgroup: !Ref AthenaWorkgroup
+
+      Policies:
+        - Statement:
+          - Sid: AthenaPolicy
+            Effect: Allow
+            Action:
+            - athena:*
+            Resource: '*'
+          - Sid: SNSPolicy
+            Effect: Allow
+            Action:
+            - sns:*
+            Resource: '*'
+          - Sid: S3Policy
+            Effect: Allow
+            Action:
+            - s3:*
+            Resource: '*'
+          - Sid: GLUEPolicy
+            Effect: Allow
+            Action:
+            - glue:*
+            Resource: '*'
