@@ -18,34 +18,74 @@ import (
 	"github.com/aws/aws-sdk-go/service/sns"
 )
 
+var Querys = []string{
+	`SELECT line_item_product_code,
+				sum(line_item_blended_cost) AS cost,
+				month
+		FROM all
+		WHERE year='2020'
+			AND month='11'
+		GROUP BY  line_item_product_code, month
+		HAVING sum(line_item_blended_cost) > 0
+		ORDER BY  line_item_product_code;`,
+}
+
 var (
-	SNS_Topic_Arn                   = os.Getenv("SNS_Topic_Arn")
-	S3Bucket_Of_AthenaReport_Output = os.Getenv("S3Bucket_Of_AthenaReport_Output")
-	Athena_Database                 = os.Getenv("Athena_Database")
-	Athena_Workgroup                = os.Getenv("Athena_Workgroup")
-	Querys                          = []string{
-		`SELECT line_item_product_code,
-					sum(line_item_blended_cost) AS cost,
-					month
-			FROM all
-			WHERE year='2020'
-				AND month='11'
-			GROUP BY  line_item_product_code, month
-			HAVING sum(line_item_blended_cost) > 0
-			ORDER BY  line_item_product_code;`,
-	}
+	S3_Bucket_Cost_And_Usage_RawData = os.Getenv("S3BucketCostAndUsageRawData")
+	//
+	SNS_Topic_Arn = os.Getenv("SNSTopicArn")
+	//
+	Athena_Database  = os.Getenv("AthenaDatabase")
+	Athena_Workgroup = os.Getenv("AthenaWorkgroup")
+	//
+	Athena_Query_Result_Location = fmt.Sprintf("s3://%s/athena-output", S3_Bucket_Cost_And_Usage_RawData)
 )
 
 func handler(ctx context.Context, s3Event events.S3Event) error {
+	fmt.Println("S3_Bucket_Cost_And_Usage_RawData 	=>", S3_Bucket_Cost_And_Usage_RawData)
+	fmt.Println("SNS_Topic_Arn 						=>", SNS_Topic_Arn)
+	fmt.Println("Athena_Database 					=>", Athena_Database)
+	fmt.Println("Athena_Workgroup 					=>", Athena_Workgroup)
+	fmt.Println("Athena_Query_Result_Location 		=>", Athena_Query_Result_Location)
+	err := check_env()
+	if err != nil {
+		panic(err)
+	}
+
 	for _, record := range s3Event.Records {
 		s3 := record.S3
 		fmt.Printf("[%s - %s] Bucket = %s, Key = %s \n", record.EventSource, record.EventTime, s3.Bucket.Name, s3.Object.Key)
+	}
+
+	for _, query := range Querys {
+		queryExecutionId := athena_startQueryExecution(query)
+		bucket, key := athena_getQueryExecution(queryExecutionId)
+		url, content := s3_getObjectAndPresignedURL(bucket, key)
+		sns_publish(url, content)
 	}
 	return nil
 }
 
 func main() {
 	lambda.Start(handler)
+}
+
+//
+func check_env() (err error) {
+	var env_issue = ""
+	if len(S3_Bucket_Cost_And_Usage_RawData) == 0 {
+		env_issue = "S3_Bucket_Cost_And_Usage_RawData"
+	} else if len(SNS_Topic_Arn) == 0 {
+		env_issue = "SNS_Topic_Arn"
+	} else if len(Athena_Database) == 0 {
+		env_issue = "Athena_Database"
+	} else if len(Athena_Workgroup) == 0 {
+		env_issue = "Athena_Workgroup"
+	}
+	if len(env_issue) != 0 {
+		err = errors.New(fmt.Sprintf("%s is empty", env_issue))
+	}
+	return err
 }
 
 // athena
@@ -58,7 +98,7 @@ func athena_startQueryExecution(query string) (queryExecutionId string) {
 	queryExecutionContext.SetDatabase(Athena_Database)
 	//
 	resultConfiguration := athena.ResultConfiguration{}
-	resultConfiguration.SetOutputLocation(S3Bucket_Of_AthenaReport_Output)
+	resultConfiguration.SetOutputLocation(Athena_Query_Result_Location)
 	//
 	input := athena.StartQueryExecutionInput{
 		QueryString:           aws.String(query),
@@ -96,7 +136,7 @@ func athena_getQueryExecution(queryExecutionId string) (s3_bucket, s3_key string
 // s3
 var svc_s3 = s3.New(mySession)
 
-func s3_GetObjectAndPresignedURL(bucket, key string) (urlStr, contentStr string) {
+func s3_getObjectAndPresignedURL(bucket, key string) (urlStr, contentStr string) {
 	req, result := svc_s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -120,9 +160,14 @@ func s3_GetObjectAndPresignedURL(bucket, key string) (urlStr, contentStr string)
 //
 var svc_sns = sns.New(mySession)
 
-func sns_publish(message string) {
+func sns_publish(url, content string) {
+	//
+	msg_content := fmt.Sprintf("```\n%s\n```", strings.TrimSpace(content))
+	msg_url := fmt.Sprintf("<%s|download_link>", url)
+	final_msg := fmt.Sprintf("*Hello, this is Cost And Usage Report*\n\n%s\n%s", msg_content, msg_url)
+	//
 	input := sns.PublishInput{}
-	input.SetMessage(message)
+	input.SetMessage(final_msg)
 	input.SetSubject("Cost And Usage Report")
 	input.SetTopicArn(SNS_Topic_Arn)
 

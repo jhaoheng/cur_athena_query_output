@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Use lambda to run Athena query and get result
+
+  '
+Globals:
+  Function:
+    Timeout: 900
+    Runtime: go1.x
+    MemorySize: 128
+Parameters:
+  S3BucketCostAndUsageRawData:
+    Type: String
+    Default: cost-and-usage
+    Description: s3 bucket name, to save Cost-And-Usage Raw Data
+  SNSTopicArn:
+    Type: String
+    Default: '...'
+    Description: ''
+Resources:
+  LambdaGenerateAthenaReport:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LambdaGenerateAthenaReport
+      Handler: app
+      FunctionName: generateAthenaReport
+      Description: cost-and-usage bucket -> event -> lambda, process data -> sns
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: S3Bucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                - Name: suffix
+                  Value: .csv
+      Environment:
+        Variables:
+          S3BucketCostAndUsageRawData:
+            Ref: S3BucketCostAndUsageRawData
+          SNSTopicArn:
+            Ref: SNSTopicArn
+          AthenaDatabase: '...'
+          AthenaWorkgroup: primary
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Ref: S3BucketCostAndUsageRawData
+      LifecycleConfiguration:
+        Rules:
+        - Id: DeleteContentAfter30Days
+          ExpirationInDays: 30
+          Status: Enabled
+Outputs:
+  s3bucket:
+    Description: Information about the value
+    Value:
+      Ref: S3BucketCostAndUsageRawData
+    Export:
+      Name:
+        Ref: S3BucketCostAndUsageRawData
