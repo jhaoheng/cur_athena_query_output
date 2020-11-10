@@ -12,7 +12,7 @@ Globals:
 Parameters:
   S3BucketCostAndUsageRawData:
     Type: String
-    Default: "cost-and-usage"
+    Default: "cost-and-usage-$AccountID"
     Description: "s3 bucket name, where the Cost-And-Usage Raw Data are saved."
   # report
   SNSTopicArn:
@@ -21,11 +21,15 @@ Parameters:
     Description: ""
   AthenaDatabase:
     Type: String
-    Default: "athenacurcfn_$ReportName"
+    Default: "athenacurcfn_my_cost_and_usage"
     Description: ""
   AthenaWorkgroup:
     Type: String
     Default: "primary"
+    Description: ""
+  AthenaTable:
+    Type: String
+    Default: "my_cost_and_usage"
     Description: ""
   
 
@@ -52,6 +56,7 @@ Resources:
           SNSTopicArn: !Ref SNSTopicArn
           AthenaDatabase: !Ref AthenaDatabase
           AthenaWorkgroup: !Ref AthenaWorkgroup
+          AthenaTable: !Ref AthenaTable
 
       Policies:
         - Statement:

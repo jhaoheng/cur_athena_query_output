@@ -22,7 +22,7 @@ SELECT line_item_product_code,
 	sum(line_item_blended_cost) AS cost,
 	month
 FROM %s
-WHERE year='%s' AND month='%s'
+WHERE year='%v' AND month='%v'
 GROUP BY  line_item_product_code, month
 HAVING sum(line_item_blended_cost) > 0
 ORDER BY  line_item_product_code;
@@ -35,6 +35,7 @@ var (
 	//
 	Athena_Database  = os.Getenv("AthenaDatabase")
 	Athena_Workgroup = os.Getenv("AthenaWorkgroup")
+	Athena_Table     = os.Getenv("AthenaTable")
 	//
 	Athena_Query_Result_Location = fmt.Sprintf("s3://%s/athena-output", S3_Bucket_Cost_And_Usage_RawData)
 )
@@ -44,6 +45,7 @@ func handler(ctx context.Context) error {
 	fmt.Println("SNS_Topic_Arn 						=>", SNS_Topic_Arn)
 	fmt.Println("Athena_Database 					=>", Athena_Database)
 	fmt.Println("Athena_Workgroup 					=>", Athena_Workgroup)
+	fmt.Println("Athena_Table 						=>", Athena_Table)
 	fmt.Println("Athena_Query_Result_Location 		=>", Athena_Query_Result_Location)
 	err := check_env()
 	if err != nil {
@@ -52,7 +54,8 @@ func handler(ctx context.Context) error {
 
 	//
 	year, month, _ := time.Now().UTC().Date()
-	Query = fmt.Sprintf(Query, Athena_Database, year, int(month))
+	Query = fmt.Sprintf(Query, Athena_Table, year, int(month))
+	fmt.Println("Query =>", Query)
 	//
 	queryExecutionId := athena_startQueryExecution(Query)
 	fmt.Println("queryExecutionId =>", queryExecutionId)

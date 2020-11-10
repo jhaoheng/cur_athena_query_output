@@ -3,17 +3,28 @@ package main
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
+func Test_Query(t *testing.T) {
+	Athena_Table = "my_cost_and_usage"
+	year, month, _ := time.Now().UTC().Date()
+	Query = fmt.Sprintf(Query, Athena_Table, year, int(month))
+	fmt.Println("Query =>", Query)
+}
+
 func Test_athena_startQueryExecution(t *testing.T) {
-	Athena_Database = "athenacurcfn_all"
+	Athena_Database = "athenacurcfn_my_cost_and_usage"
 	Athena_Query_Result_Location = "s3://aws-athena-query-results-424613967558-ap-southeast-1/result/"
 	Athena_Workgroup = "primary"
+	Athena_Table = "my_cost_and_usage"
+	//
+	year, month, _ := time.Now().UTC().Date()
+	Query = fmt.Sprintf(Query, Athena_Table, year, int(month))
+	fmt.Println("Query =>", Query)
+	queryExecutionId := athena_startQueryExecution(Query)
+	fmt.Println(queryExecutionId)
 
-	for _, query := range Querys {
-		queryExecutionId := athena_startQueryExecution(query)
-		fmt.Println(queryExecutionId)
-	}
 }
 
 func Test_athena_getQueryExecution(t *testing.T) {

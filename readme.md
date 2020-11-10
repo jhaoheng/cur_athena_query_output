@@ -1,6 +1,6 @@
 ## 目的
 - 建立完成 cost and usage report 後
-- 透過 crawler-cfn.yml 建立 自動化 匯入資料到 Athena 的服務
+- 透過 crawler-cfn.yml 建立匯入資料到 Athena 的服務
 - 透過 cur-athena-query-output 的部署, 每日執行一次 Athena query summary, 並輸出結果到 SNS
 - 可透過從 sns 中訂閱, 取得報告
 - 透過每日的訂閱報告, 若發生數據資料不正常, 可執行 Athena Detail Query, 來檢查資訊
@@ -17,8 +17,9 @@
         - Athena
             - AthenaDatabase = `athenacurcfn_$report_name`
             - AthenaWorkgroup = `primary`
+            - AthenaTable = `$report_name`
         - S3BucketCostAndUsageRawData = `$rawDataBucket`
-        - SNSTopicArn = 
+        - SNSTopicArn = `...`
 3. 部署 整合 athena 的 crawler-cfn.yml : `https://docs.aws.amazon.com/cur/latest/userguide/cur-ate-setup.html`
     1. 需等待八個小時, 等待 AWS 產生資料
     2. 資料產生完畢後, 到 bucket 中, 可找到 AWS 自動建立的 .yml 的 crawler-cfn.yml 設定檔
