@@ -5,6 +5,8 @@
 - 可透過從 sns 中訂閱, 取得報告
 - 透過每日的訂閱報告, 若發生數據資料不正常, 可執行 Athena Detail Query, 來檢查資訊
 
+![img](./docs/daily-output.png)
+
 ## 建立順序
 1. 在 Cost Management, 建立 cost-and-usage report
     - [ ] : 設定 `$report_name`, 格式滿足 `小寫`, `單字間用底線隔開`
