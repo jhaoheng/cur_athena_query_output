@@ -1,9 +1,12 @@
 ## 目的
-- 建立完成 cost and usage report 後
-- 透過 crawler-cfn.yml 建立匯入資料到 Athena 的服務
-- 透過 cur-athena-query-output 的部署, 每日執行一次 Athena query summary, 並輸出結果到 SNS
-- 可透過從 sns 中訂閱, 取得報告
-- 透過每日的訂閱報告, 若發生數據資料不正常, 可執行 Athena Detail Query, 來檢查資訊
+- 想要解決的問題 
+    - 我知道可以透過 bills 來取得當月的所有花費, 但 bills 僅可以列出到目前為止當月的總量花費, 如何得知每時/日均有持續增加的花費?
+- 作法
+    - 建立完成 cost and usage report 後
+    - 透過 crawler-cfn.yml 建立匯入資料到 Athena 的服務
+    - 透過 cur-athena-query-output 的部署, 每時/日執行一次 Athena query summary, 並輸出結果到 SNS
+    - 可透過從 sns 中訂閱, 取得報告
+    - 透過每日的訂閱報告, 若發生數據資料不正常, 可執行 Athena Detail Query, 來檢查資訊
 
 ![img](./docs/daily-output.png)
 
