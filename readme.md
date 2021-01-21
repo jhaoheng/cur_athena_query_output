@@ -8,7 +8,7 @@
 ![img](./docs/daily-output.png)
 
 ## 建立順序
-1. 在 Cost Management, 建立 cost-and-usage report
+1. 在 Cost Management, 建立 cost-and-usage report, 第一次建立需要等待最多 24 小時, 將報告放到 S3
     - [ ] : 設定 `$report_name`, 格式滿足 `小寫`, `單字間用底線隔開`
     - [ ] : 勾選 `Include resource IDs`
     - [ ] : 建立資料存放的 `$rawDataBucket`
@@ -23,10 +23,11 @@
         - S3BucketCostAndUsageRawData = `$rawDataBucket`
         - SNSTopicArn = `...`
 3. 部署 整合 athena 的 crawler-cfn.yml : `https://docs.aws.amazon.com/cur/latest/userguide/cur-ate-setup.html`
-    1. 需等待八個小時, 等待 AWS 產生資料
+    1. 安裝完 cfn, 需等待最多八個小時, 讓 cfn 將資料整合到 Athena 資料
     2. 資料產生完畢後, 到 bucket 中, 可找到 AWS 自動建立的 .yml 的 crawler-cfn.yml 設定檔
     3. 下載後, 建立 crawler-cfn.yml
 4. 設定 s3 `$rawDataBucket` 中設定 Lifecycle, 避免資料儲存過多
+5. 接下來可做什麼? 整合 QuickSight
 
 ## 本地測試
 1. 設定環境
@@ -61,17 +62,4 @@ ORDER BY identity_time_interval
 
 
 
-# 不使用 S3 Event Notification 自動執行 Athena Query
-
-## 原因一 : SAM 無法對已經存在的 s3 bucket, 建立事件通知
-> it has clearly said "to specify an S3 bucket as an event source for a Lambda function, both resources have to be declared in the same template. AWS SAM does not support specifying an existing bucket as an event source."
-https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#example-awsserverlessfunctio
-
-- 所以建立好 lambda 後, 必須至 cost-and-usage 原始資料存放的 bucket 中, 建立 **event notification**
-
-## 原因二 : 若使用 CloudWatch Event 來觸發 S3 事件
-- 必須建立 Trail, 會有額外的支出 (預設只有一個免費)
-
-## 原因三 : s3 Event Notification 無法存在兩個相同的事件觸發
-- 事件觸發用於匯入資料到 Athena
 
